@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { PlusCircle, Upload, Loader } from "lucide-react";
 import { useProductStore } from "../stores/useProductStore";
@@ -21,10 +21,12 @@ const CreateProductForm = () => {
     price: "",
     category: "",
     image: "",
-    productLink: "",
+    productLink: [],
+    comingSoon: false,
   });
 
   const { createProduct, loading } = useProductStore();
+  const inputRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,9 +35,11 @@ const CreateProductForm = () => {
       setNewProduct({
         name: "",
         description: "",
+        price: "",
         category: "",
         image: "",
-        productLink: "",
+        productLink: [],
+        comingSoon: false,
       });
     } catch (error) {
       console.error("Error creating product:", error.message);
@@ -57,16 +61,57 @@ const CreateProductForm = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setNewProduct({ ...newProduct, image: reader.result });
+        setNewProduct((prev) => ({ ...prev, image: reader.result }));
       };
       reader.readAsDataURL(file);
     }
   };
 
+  // Add links from input string, splitting by comma, space, or newline
+  const addLinks = (input) => {
+    const links = input
+      .split(/[, \n]+/)
+      .map((l) => l.trim())
+      .filter((l) => l && !newProduct.productLink.includes(l));
+
+    if (links.length) {
+      setNewProduct((prev) => ({
+        ...prev,
+        productLink: [...prev.productLink, ...links],
+      }));
+    }
+  };
+
+  // Handle keydown for comma or enter to add tags
+  const handleKeyDown = (e) => {
+    if (e.key === "," || e.key === "Enter") {
+      e.preventDefault();
+      addLinks(e.target.value);
+      e.target.value = ""; // <-- Clear input after adding
+    }
+  };
+
+  // Handle paste event to add multiple links
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const paste = e.clipboardData.getData("text");
+    addLinks(paste);
+    if (inputRef.current) inputRef.current.value = ""; // <-- Clear input after paste
+  };
+
+  // Remove a link tag by index
+  const removeLink = (index) => {
+    setNewProduct((prev) => {
+      const newLinks = [...prev.productLink];
+      newLinks.splice(index, 1);
+      return { ...prev, productLink: newLinks };
+    });
+  };
+
   return (
     <div
       className="flex flex-col justify-start sm:px-6 lg:px-8 min-h-screen"
-      style={{ backgroundColor: "#121212", paddingTop: "2rem" }}
+      style={{ backgroundColor: bgTab, paddingTop: "2rem" }}
     >
       <motion.div
         className="sm:mx-auto sm:w-full sm:max-w-3xl"
@@ -74,10 +119,7 @@ const CreateProductForm = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
       >
-        <h2
-          className="text-center text-3xl font-extrabold"
-          style={{ color: greekVilla }}
-        >
+        <h2 className="text-center text-3xl font-extrabold" style={{ color: greekVilla }}>
           {/* Create New Product */}
         </h2>
       </motion.div>
@@ -88,14 +130,13 @@ const CreateProductForm = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.2 }}
       >
-<div
-  className="py-8 px-6 shadow-sm sm:rounded-lg sm:px-10"
-  style={{
-    backgroundColor: "#000000",
-    boxShadow: "0 4px 15px 0 rgba(139, 69, 19, 0.7)", // saddle brown shadow
-  }}
->
-
+        <div
+          className="py-8 px-6 shadow-sm sm:rounded-lg sm:px-10"
+          style={{
+            backgroundColor: "#000000",
+            boxShadow: `0 4px 15px 0 rgba(139, 69, 19, 0.7)`,
+          }}
+        >
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Product Name */}
             <div>
@@ -116,7 +157,7 @@ const CreateProductForm = () => {
                 }
                 className="block w-full px-3 py-2 rounded-md shadow-sm sm:text-sm"
                 style={{
-                  backgroundColor: "#121212",
+                  backgroundColor: bgTab,
                   border: `1px solid ${saddleBrown}`,
                   color: greekVilla,
                   caretColor: greekVilla,
@@ -159,8 +200,6 @@ const CreateProductForm = () => {
               />
             </div>
 
-
-
             {/* Category */}
             <div>
               <label
@@ -179,7 +218,7 @@ const CreateProductForm = () => {
                 }
                 className="block w-full px-3 py-2 rounded-md shadow-sm sm:text-sm"
                 style={{
-                  backgroundColor: "#121212",
+                  backgroundColor: bgTab,
                   border: `1px solid ${saddleBrown}`,
                   color: greekVilla,
                 }}
@@ -194,7 +233,7 @@ const CreateProductForm = () => {
                   <option
                     key={category}
                     value={category}
-                    style={{ backgroundColor: "#121212", color: greekVilla }}
+                    style={{ backgroundColor: bgTab, color: greekVilla }}
                   >
                     {category}
                   </option>
@@ -202,34 +241,80 @@ const CreateProductForm = () => {
               </select>
             </div>
 
-            {/* Product Link */}
+            {/* Product Links as tags */}
             <div>
               <label
-                htmlFor="productLink"
+                htmlFor="productLinkInput"
                 className="block text-sm font-medium"
                 style={{ color: greekVilla }}
               >
-                Product Link
+                Product Links
               </label>
-              <input
-                type="url"
-                id="productLink"
-                name="productLink"
-                value={newProduct.productLink}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, productLink: e.target.value })
-                }
-                placeholder="https://example.com/product"
-                className="block w-full px-3 py-2 rounded-md shadow-sm sm:text-sm"
+              <div
+                className="flex flex-wrap gap-2 p-2 rounded-md border"
                 style={{
-                  backgroundColor: "#121212",
+                  backgroundColor: bgTab,
                   border: `1px solid ${saddleBrown}`,
                   color: greekVilla,
-                  caretColor: greekVilla,
+                  minHeight: "60px",
+                  cursor: "text",
                 }}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-              />
+                onClick={() => inputRef.current?.focus()}
+              >
+                {newProduct.productLink.map((link, i) => (
+                  <span
+                    key={i}
+                    className="flex items-center px-2 py-1 rounded"
+                    style={{ backgroundColor: saddleBrownHover, color: greekVilla }}
+                  >
+                    {link}
+                    <button
+                      type="button"
+                      onClick={() => removeLink(i)}
+                      className="ml-1 text-xs font-bold"
+                      style={{ color: greekVilla, cursor: "pointer", background: "transparent", border: "none" }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  id="productLinkInput"
+                  placeholder="Paste/type links, press comma or enter"
+                  className="flex-grow bg-transparent border-none outline-none text-sm"
+                  style={{ color: greekVilla, caretColor: greekVilla, minWidth: "120px" }}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                style={{ color: greekVilla }}
+              >
+                Coming Soon
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setNewProduct({ ...newProduct, comingSoon: !newProduct.comingSoon })
+                }
+                className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{
+                  backgroundColor: newProduct.comingSoon ? saddleBrownHover : bgTab,
+                  color: greekVilla,
+                  borderColor: saddleBrown,
+                  transition: "background-color 0.3s ease",
+                  userSelect: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {newProduct.comingSoon ? "Enabled" : "Disabled"}
+              </button>
             </div>
 
             {/* Image Upload */}
@@ -259,20 +344,14 @@ const CreateProductForm = () => {
             {/* Submit Button */}
             <button
               type="submit"
+              className="inline-flex w-full justify-center rounded-md border border-transparent bg-saddleBrown px-4 py-2 text-sm font-semibold text-greekVilla shadow-sm hover:bg-saddleBrownHover focus:outline-none focus:ring-2 focus:ring-offset-2"
               disabled={loading}
-              className="w-full flex justify-center items-center py-2 px-4 rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out disabled:opacity-50"
               style={{ backgroundColor: saddleBrown, color: greekVilla }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = saddleBrownHover)
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = saddleBrown)
-              }
             >
               {loading ? (
                 <>
-                  <Loader className="mr-2 h-5 w-5 animate-spin" />
-                  Loading...
+                  <Loader className="animate-spin mr-2 h-5 w-5" />
+                  Creating...
                 </>
               ) : (
                 <>

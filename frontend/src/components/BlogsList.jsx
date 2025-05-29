@@ -2,6 +2,11 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Trash } from "lucide-react";
 import { useBlogStore } from "../stores/useBlogStore";
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
+import EditBlogForm from "./EditBlogForm";
+
+const MySwal = withReactContent(Swal);
 
 const saddleBrown = "#8B4513";
 const saddleBrownHover = "#7A3E0F";
@@ -20,11 +25,30 @@ const formatDateTime = (dateString) => {
 };
 
 const BlogsList = () => {
-  const { blogs, fetchAllBlogs, deleteBlog } = useBlogStore();
+  const { blogs, fetchAllBlogs, deleteBlog, updateBlog } = useBlogStore();
 
   useEffect(() => {
     fetchAllBlogs();
   }, []);
+
+  const openEditModal = (blog) => {
+    MySwal.fire({
+      title: <span style={{ color: "white" }}>Edit Blog</span>,
+      html: (
+        <EditBlogForm
+          blogId={blog._id}               // <-- Pass blogId here
+          onClose={() => MySwal.close()}
+        />
+      ),
+      showConfirmButton: false,
+      showCancelButton: false,
+      background: bgTab,
+      width: "900px",
+      customClass: {
+        popup: "rounded-lg",
+      },
+    });
+  };
 
   return (
     <motion.div
@@ -34,10 +58,10 @@ const BlogsList = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
     >
-      <table className="min-w-full" style={{ borderCollapse: "separate", borderSpacing: "0" }}>
+      <table className="min-w-full" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
         <thead>
           <tr style={{ borderBottom: `2px solid ${saddleBrown}` }}>
-            {["Image", "Title", "Description", "ID", "Date", "Actions"].map((header) => (
+            {["Image", "Title", "Description", "Date", "Edit", "Delete"].map((header) => (
               <th
                 key={header}
                 scope="col"
@@ -71,10 +95,7 @@ const BlogsList = () => {
                   style={{ border: `1px solid ${saddleBrown}` }}
                 />
               </td>
-              <td
-                className="px-6 py-4 text-sm font-medium"
-                style={{ color: greekVilla }}
-              >
+              <td className="px-6 py-4 text-sm font-medium" style={{ color: greekVilla }}>
                 {blog.blogTitle}
               </td>
               <td className="px-6 py-4 max-w-xs">
@@ -84,17 +105,22 @@ const BlogsList = () => {
                   dangerouslySetInnerHTML={{ __html: blog.blogDescription }}
                 />
               </td>
-              <td
-                className="px-6 py-4 text-sm"
-                style={{ color: "#7D7D7D", fontFamily: "monospace" }}
-              >
-                {blog._id}
-              </td>
-              <td
-                className="px-6 py-4 text-sm"
-                style={{ color: "#7D7D7D", fontFamily: "monospace" }}
-              >
+              <td className="px-6 py-4 text-sm" style={{ color: "#7D7D7D", fontFamily: "monospace" }}>
                 {formatDateTime(blog.createdAt)}
+              </td>
+              <td className="px-6 py-4 text-sm font-medium">
+                <button
+                  onClick={() => openEditModal(blog)}
+                  style={{
+                    color: "#4A90E2",
+                    transition: "color 0.3s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#357ABD")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#4A90E2")}
+                  aria-label={`Edit blog ${blog.blogTitle}`}
+                >
+                  Edit
+                </button>
               </td>
               <td className="px-6 py-4 text-sm font-medium">
                 <button

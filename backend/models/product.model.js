@@ -22,10 +22,19 @@ const productSchema = new mongoose.Schema({
 		default: false,
 	},
 
-	productLink: {
-		type: String,
-		required: false, // Optional
+productLink: {
+  type: [String], // was String before
+  default: [],
+},
+
+
+	comingSoon: {
+		type: Boolean,
+		default: false,
 	},
+
+
+
 }, {
 	timestamps: true
 });

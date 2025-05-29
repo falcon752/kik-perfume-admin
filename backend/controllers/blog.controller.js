@@ -11,6 +11,24 @@ export const createBlog = async (req, res) => {
   }
 };
 
+// In blog.controller.js
+export const updateBlog = async (req, res) => {
+  try {
+    const { blogTitle, blogDescription, blogImage } = req.body;
+    const updatedBlog = await Blog.findByIdAndUpdate(
+      req.params.id,
+      { blogTitle, blogDescription, blogImage },
+      { new: true }
+    );
+    if (!updatedBlog) return res.status(404).json({ message: "Blog not found" });
+    res.status(200).json({ message: "Blog updated", blog: updatedBlog });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update blog", error: error.message });
+  }
+};
+
+
+
 export const getAllBlogs = async (req, res) => {
   try {
     const blogs = await Blog.find().sort({ createdAt: -1 });

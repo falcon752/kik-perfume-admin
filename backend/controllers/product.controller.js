@@ -40,12 +40,12 @@ export const getFeaturedProducts = async (req, res) => {
 	}
 };
 
+
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, image, category, productLink } = req.body; // removed price
+    const { name, description, image, category, productLink, comingSoon } = req.body;
 
     let cloudinaryResponse = null;
-
     if (image) {
       cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
     }
@@ -53,10 +53,14 @@ export const createProduct = async (req, res) => {
     const product = await Product.create({
       name,
       description,
-      // price removed
       image: cloudinaryResponse?.secure_url || "",
       category,
-      productLink,
+      productLink: Array.isArray(productLink)
+        ? productLink
+        : productLink
+        ? [productLink]
+        : [],
+      comingSoon: comingSoon || false,
     });
 
     res.status(201).json(product);
@@ -66,6 +70,51 @@ export const createProduct = async (req, res) => {
   }
 };
 
+export const updateProduct = async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const { name, description, image, category, productLink, comingSoon } = req.body;
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (image && image !== product.image) {
+      if (product.image) {
+        const publicId = product.image.split("/").pop().split(".")[0];
+        try {
+          await cloudinary.uploader.destroy(`products/${publicId}`);
+        } catch (error) {
+          console.log("Error deleting old image from Cloudinary", error);
+        }
+      }
+
+      const cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
+      product.image = cloudinaryResponse.secure_url;
+    }
+
+    product.name = name || product.name;
+    product.description = description || product.description;
+    product.category = category || product.category;
+
+    if (productLink !== undefined) {
+      product.productLink = Array.isArray(productLink)
+        ? productLink
+        : typeof productLink === 'string'
+        ? [productLink]
+        : product.productLink;
+    }
+
+    product.comingSoon = comingSoon !== undefined ? comingSoon : product.comingSoon;
+
+    const updatedProduct = await product.save();
+    res.json(updatedProduct);
+  } catch (error) {
+    console.log("Error in updateProduct controller", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
 
 export const deleteProduct = async (req, res) => {

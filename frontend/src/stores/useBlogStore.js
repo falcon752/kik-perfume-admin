@@ -2,7 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import axios from "../lib/axios";
 
-export const useBlogStore = create((set) => ({
+export const useBlogStore = create((set, get) => ({
   blogs: [],
   currentBlog: null,
   loading: false,
@@ -27,9 +27,11 @@ export const useBlogStore = create((set) => ({
     try {
       const res = await axios.get(`/blogs/${id}`);
       set({ currentBlog: res.data.blog, loading: false });
+      return res.data.blog; // return blog data for use in component
     } catch (error) {
       set({ loading: false, error: error.response?.data?.error || "Failed to fetch blog" });
       toast.error(error.response?.data?.error || "Failed to fetch blog");
+      throw error;
     }
   },
 
@@ -45,6 +47,21 @@ export const useBlogStore = create((set) => ({
     } catch (error) {
       set({ loading: false, error: error.response?.data?.error || "Failed to create blog" });
       toast.error(error.response?.data?.error || "Failed to create blog");
+    }
+  },
+
+  updateBlog: async (id, updatedData) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await axios.put(`/blogs/${id}`, updatedData);
+      set((state) => ({
+        blogs: state.blogs.map((blog) => (blog._id === id ? res.data.blog : blog)),
+        loading: false,
+      }));
+      toast.success("Blog updated successfully");
+    } catch (error) {
+      set({ loading: false, error: error.response?.data?.error || "Failed to update blog" });
+      toast.error(error.response?.data?.error || "Failed to update blog");
     }
   },
 
