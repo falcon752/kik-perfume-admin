@@ -5,7 +5,7 @@ import axios from "../lib/axios";
 export const useProductStore = create((set) => ({
   products: [],
   loading: false,
-  currentProduct: null, // for editing
+  currentProduct: null, // used to populate form for editing
 
   setProducts: (products) => set({ products }),
   setCurrentProduct: (product) => set({ currentProduct: product }),
@@ -18,6 +18,7 @@ export const useProductStore = create((set) => ({
         products: [...prevState.products, res.data],
         loading: false,
       }));
+      toast.success("Product created");
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to create product");
       set({ loading: false });
@@ -69,7 +70,9 @@ export const useProductStore = create((set) => ({
     try {
       await axios.delete(`/products/${productId}`);
       set((prevState) => ({
-        products: prevState.products.filter((product) => product._id !== productId),
+        products: prevState.products.filter(
+          (product) => product._id !== productId
+        ),
         loading: false,
       }));
       toast.success("Product deleted");
@@ -91,6 +94,7 @@ export const useProductStore = create((set) => ({
         ),
         loading: false,
       }));
+      toast.success("Product feature toggled");
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to update product");
       set({ loading: false });

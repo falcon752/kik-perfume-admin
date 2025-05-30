@@ -2,7 +2,6 @@ import { redis } from "../lib/redis.js";
 import cloudinary from "../lib/cloudinary.js";
 import Product from "../models/product.model.js";
 
-
 export const getAllProducts = async (req, res) => {
 	try {
 		const products = await Product.find({}); // find all products
@@ -20,16 +19,11 @@ export const getFeaturedProducts = async (req, res) => {
 			return res.json(JSON.parse(featuredProducts));
 		}
 
-		// if not in redis, fetch from mongodb
-		// .lean() is gonna return a plain javascript object instead of a mongodb document
-		// which is good for performance
 		featuredProducts = await Product.find({ isFeatured: true }).lean();
 
 		if (!featuredProducts) {
 			return res.status(404).json({ message: "No featured products found" });
 		}
-
-		// store in redis for future quick access
 
 		await redis.set("featured_products", JSON.stringify(featuredProducts));
 
@@ -40,82 +34,114 @@ export const getFeaturedProducts = async (req, res) => {
 	}
 };
 
-
 export const createProduct = async (req, res) => {
-  try {
-    const { name, description, image, category, productLink, comingSoon } = req.body;
+	try {
+		const { name, description, images, category, productLink, comingSoon } = req.body;
 
-    let cloudinaryResponse = null;
-    if (image) {
-      cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
-    }
+		let imageUrls = [];
 
-    const product = await Product.create({
-      name,
-      description,
-      image: cloudinaryResponse?.secure_url || "",
-      category,
-      productLink: Array.isArray(productLink)
-        ? productLink
-        : productLink
-        ? [productLink]
-        : [],
-      comingSoon: comingSoon || false,
-    });
+		if (Array.isArray(images)) {
+			for (const img of images) {
+				// Upload if the image is a base64 string or data URI (new image)
+				if (typeof img === "string" && (img.startsWith("data:") || img.startsWith("http") === false)) {
+					const response = await cloudinary.uploader.upload(img, { folder: "products" });
+					imageUrls.push(response.secure_url);
+				} else if (typeof img === "string") {
+					// If it's already a URL, just push it as is (rare for create, but safe)
+					imageUrls.push(img);
+				}
+			}
+		}
 
-    res.status(201).json(product);
-  } catch (error) {
-    console.log("Error in createProduct controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
+		const product = await Product.create({
+			name,
+			description,
+			images: imageUrls,
+			category,
+			productLink: Array.isArray(productLink) ? productLink : productLink ? [productLink] : [],
+			comingSoon: comingSoon || false,
+		});
+
+		res.status(201).json(product);
+	} catch (error) {
+		console.log("Error in createProduct controller", error.message);
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
 };
 
 export const updateProduct = async (req, res) => {
-  try {
-    const productId = req.params.id;
-    const { name, description, image, category, productLink, comingSoon } = req.body;
+	try {
+		const productId = req.params.id;
+		const { name, description, images, category, productLink, comingSoon, removedImages } = req.body;
 
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
+		const product = await Product.findById(productId);
+		if (!product) {
+			return res.status(404).json({ message: "Product not found" });
+		}
 
-    if (image && image !== product.image) {
-      if (product.image) {
-        const publicId = product.image.split("/").pop().split(".")[0];
-        try {
-          await cloudinary.uploader.destroy(`products/${publicId}`);
-        } catch (error) {
-          console.log("Error deleting old image from Cloudinary", error);
-        }
-      }
+		// Delete removed images from Cloudinary
+		if (Array.isArray(removedImages) && removedImages.length > 0) {
+			for (const imgUrl of removedImages) {
+				try {
+					const parts = imgUrl.split("/");
+					const filename = parts[parts.length - 1]; // e.g. "abc123.jpg"
+					const publicId = `products/${filename.split(".")[0]}`;
+					await cloudinary.uploader.destroy(publicId);
+				} catch (error) {
+					console.log("Error deleting removed image from Cloudinary", error);
+				}
+			}
+		}
 
-      const cloudinaryResponse = await cloudinary.uploader.upload(image, { folder: "products" });
-      product.image = cloudinaryResponse.secure_url;
-    }
+		// Build new image array keeping existing URLs (not removed) and uploading new base64 images
+		let updatedImages = [];
 
-    product.name = name || product.name;
-    product.description = description || product.description;
-    product.category = category || product.category;
+		if (Array.isArray(images)) {
+			for (const img of images) {
+				if (typeof img === "string") {
+					if (img.startsWith("data:")) {
+						// New image (base64/data URI) -> upload
+						const response = await cloudinary.uploader.upload(img, { folder: "products" });
+						updatedImages.push(response.secure_url);
+					} else {
+						// Existing image URL -> keep it if not in removedImages
+						if (!removedImages || !removedImages.includes(img)) {
+							updatedImages.push(img);
+						}
+					}
+				}
+			}
+		}
 
-    if (productLink !== undefined) {
-      product.productLink = Array.isArray(productLink)
-        ? productLink
-        : typeof productLink === 'string'
-        ? [productLink]
-        : product.productLink;
-    }
+		product.images = updatedImages.length > 0 ? updatedImages : product.images;
 
-    product.comingSoon = comingSoon !== undefined ? comingSoon : product.comingSoon;
+		product.name = name || product.name;
+		product.description = description || product.description;
+		product.category = category || product.category;
 
-    const updatedProduct = await product.save();
-    res.json(updatedProduct);
-  } catch (error) {
-    console.log("Error in updateProduct controller", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
+		if (productLink !== undefined) {
+			product.productLink = Array.isArray(productLink)
+				? productLink
+				: typeof productLink === "string"
+				? [productLink]
+				: product.productLink;
+		}
+
+		product.comingSoon = comingSoon !== undefined ? comingSoon : product.comingSoon;
+
+		const updatedProduct = await product.save();
+
+		// Update cache if product is featured
+		if (updatedProduct.isFeatured) {
+			await updateFeaturedProductsCache();
+		}
+
+		res.json(updatedProduct);
+	} catch (error) {
+		console.log("Error in updateProduct controller", error.message);
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
 };
-
 
 export const deleteProduct = async (req, res) => {
 	try {
@@ -125,17 +151,25 @@ export const deleteProduct = async (req, res) => {
 			return res.status(404).json({ message: "Product not found" });
 		}
 
-		if (product.image) {
-			const publicId = product.image.split("/").pop().split(".")[0];
-			try {
-				await cloudinary.uploader.destroy(`products/${publicId}`);
-				console.log("deleted image from cloduinary");
-			} catch (error) {
-				console.log("error deleting image from cloduinary", error);
+		// Delete all images from Cloudinary
+		if (product.images && product.images.length > 0) {
+			for (const imgUrl of product.images) {
+				try {
+					const parts = imgUrl.split("/");
+					const filename = parts[parts.length - 1];
+					const publicId = `products/${filename.split(".")[0]}`;
+					await cloudinary.uploader.destroy(publicId);
+					console.log("Deleted image from Cloudinary");
+				} catch (error) {
+					console.log("Error deleting image from Cloudinary", error);
+				}
 			}
 		}
 
 		await Product.findByIdAndDelete(req.params.id);
+
+		// Update cache if needed
+		await updateFeaturedProductsCache();
 
 		res.json({ message: "Product deleted successfully" });
 	} catch (error) {
@@ -155,8 +189,7 @@ export const getRecommendedProducts = async (req, res) => {
 					_id: 1,
 					name: 1,
 					description: 1,
-					image: 1,
-				
+					images: 1,
 				},
 			},
 		]);
@@ -198,15 +231,12 @@ export const toggleFeaturedProduct = async (req, res) => {
 
 async function updateFeaturedProductsCache() {
 	try {
-		// The lean() method  is used to return plain JavaScript objects instead of full Mongoose documents. This can significantly improve performance
-
 		const featuredProducts = await Product.find({ isFeatured: true }).lean();
 		await redis.set("featured_products", JSON.stringify(featuredProducts));
 	} catch (error) {
-		console.log("error in update cache function");
+		console.log("Error in updateFeaturedProductsCache function", error.message);
 	}
 }
-
 
 export const getProductById = async (req, res) => {
 	try {
@@ -219,4 +249,3 @@ export const getProductById = async (req, res) => {
 		res.status(500).json({ message: error.message });
 	}
 };
-

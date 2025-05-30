@@ -14,11 +14,11 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
     name: "",
     description: "",
     category: "",
-    image: "",
+    images: [],
     productLink: [],
     comingSoon: false,
   });
-
+  const [removedImages, setRemovedImages] = useState([]);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -26,15 +26,16 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
       name: "",
       description: "",
       category: "",
-      image: "",
+      images: [],
       productLink: [],
       comingSoon: false,
       ...product,
+      images: Array.isArray(product?.images) ? product.images : [],
       productLink: Array.isArray(product?.productLink) ? product.productLink : [],
     });
+    setRemovedImages([]);
   }, [product]);
 
-  // Input change handler
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name !== "productLink") {
@@ -45,7 +46,6 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
     }
   };
 
-  // Add links helper
   const addLinks = (input) => {
     const links = input
       .split(/[, \n]+/)
@@ -82,23 +82,46 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
     });
   };
 
-  // Handle image change (copied styles from EditBlogForm)
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setEditedProduct((prev) => ({ ...prev, image: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const readers = files.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readers).then((images) => {
+      setEditedProduct((prev) => ({
+        ...prev,
+        images: [...prev.images, ...images], // Append multiple images
+      }));
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    const removedImg = editedProduct.images[index];
+    setEditedProduct((prev) => {
+      const updatedImages = [...prev.images];
+      updatedImages.splice(index, 1);
+      return { ...prev, images: updatedImages };
+    });
+
+    if (typeof removedImg === "string" && removedImg.startsWith("http")) {
+      setRemovedImages((prev) => [...prev, removedImg]);
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ ...editedProduct, removedImages });
   };
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave(editedProduct);
-      }}
+      onSubmit={handleSubmit}
       style={{
         backgroundColor: bgTab,
         color: greekVilla,
@@ -221,6 +244,7 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
                   cursor: "pointer",
                   fontWeight: "bold",
                 }}
+                aria-label={`Remove link ${link}`}
               >
                 ×
               </button>
@@ -244,11 +268,11 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
         </div>
       </label>
 
-      {/* Image upload button & preview: styles copied from EditBlogForm */}
       <input
         type="file"
         id="editImageUpload"
         accept="image/*"
+        multiple
         onChange={handleImageChange}
         className="sr-only"
       />
@@ -262,22 +286,59 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
           userSelect: "none",
           width: "fit-content",
         }}
+        aria-label="Select product images"
       >
-        Upload New Product Image
+        Select Images
       </label>
 
-      {editedProduct.image && (
-        <img
-          src={editedProduct.image}
-          alt="Product Preview"
-          className="mt-2 rounded-md object-cover"
-          style={{
-            height: "80px",
-            width: "80px",
-            border: `1px solid ${saddleBrown}`,
-            userSelect: "none",
-          }}
-        />
+      {editedProduct.images?.length > 0 && (
+        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+          {editedProduct.images.map((img, index) => (
+            <div
+              key={index}
+              style={{
+                position: "relative",
+                display: "inline-block",
+              }}
+            >
+              <img
+                src={img}
+                alt={`Product ${index}`}
+                style={{
+                  height: "80px",
+                  width: "80px",
+                  objectFit: "cover",
+                  border: `1px solid ${saddleBrown}`,
+                  borderRadius: "6px",
+                  userSelect: "none",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveImage(index)}
+                style={{
+                  position: "absolute",
+                  top: "-6px",
+                  right: "-6px",
+                  background: "red",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "20px",
+                  height: "20px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  fontSize: "12px",
+                  lineHeight: "20px",
+                  textAlign: "center",
+                }}
+                aria-label={`Remove image ${index + 1}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
       )}
 
       <label style={{ cursor: "pointer" }}>
@@ -299,10 +360,11 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
             backgroundColor: "transparent",
             color: greekVilla,
             border: `1px solid ${saddleBrown}`,
+            borderRadius: "6px",
             padding: "0.5rem 1rem",
-            borderRadius: "4px",
-            cursor: "pointer",
+            cursor: loading ? "not-allowed" : "pointer",
           }}
+          disabled={loading}
         >
           Cancel
         </button>
@@ -312,16 +374,13 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
           style={{
             backgroundColor: saddleBrown,
             color: greekVilla,
+            borderRadius: "6px",
             padding: "0.5rem 1rem",
-            borderRadius: "4px",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.6 : 1,
             border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = saddleBrownHover)}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = saddleBrown)}
         >
-          {loading ? "Saving..." : "Save Changes"}
+          {loading ? "Saving..." : "Save"}
         </button>
       </div>
     </form>

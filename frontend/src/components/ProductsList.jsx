@@ -4,7 +4,7 @@ import withReactContent from "sweetalert2-react-content";
 import { motion } from "framer-motion";
 import { Trash } from "lucide-react";
 import { useProductStore } from "../stores/useProductStore";
-import EditProductForm from "./EditProductForm"; // <-- import your new form component
+import EditProductForm from "./EditProductForm";
 
 const saddleBrown = "#8B4513";
 const saddleBrownHover = "#7A3E0F";
@@ -20,14 +20,16 @@ const ProductsList = () => {
   const openEditModal = (product) => {
     MySwal.fire({
       title: <span style={{ color: "white" }}>Edit Product</span>,
-      html: <EditProductForm
-        product={product}
-        onSave={(updatedProduct) => {
-          updateProduct(updatedProduct);
-          MySwal.close();
-        }}
-        onCancel={() => MySwal.close()}
-      />,
+      html: (
+        <EditProductForm
+          product={product}
+          onSave={(updatedProduct) => {
+            updateProduct(updatedProduct);
+            MySwal.close();
+          }}
+          onCancel={() => MySwal.close()}
+        />
+      ),
       showConfirmButton: false,
       showCancelButton: false,
       background: bgTab,
@@ -73,22 +75,27 @@ const ProductsList = () => {
                 transition: "background-color 0.3s",
               }}
               onClick={() => setCurrentProduct(product)}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = saddleBrownHover + "33")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = bgTab)
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = saddleBrownHover + "33")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bgTab)}
             >
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-10 w-10">
-                    <img
-                      className="h-10 w-10 rounded-full object-cover"
-                      src={product.image}
-                      alt={product.name}
-                      style={{ border: `1px solid ${saddleBrown}` }}
-                    />
+                    {Array.isArray(product.images) && product.images.length > 0 ? (
+                      <img
+                        className="h-10 w-10 rounded-full object-cover"
+                        src={product.images[0]}
+                        alt={product.name}
+                        style={{ border: `1px solid ${saddleBrown}` }}
+                      />
+                    ) : (
+                      <div
+                        className="h-10 w-10 rounded-full flex items-center justify-center text-xs text-gray-500"
+                        style={{ border: `1px solid ${saddleBrown}`, fontStyle: "italic" }}
+                      >
+                        No image
+                      </div>
+                    )}
                   </div>
                   <div className="ml-4">
                     <div style={{ color: greekVilla, fontWeight: "600" }}>{product.name}</div>
@@ -117,16 +124,18 @@ const ProductsList = () => {
                   onMouseEnter={(e) => (e.currentTarget.style.color = "#38D14C")}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "#50FA7B")}
                 >
-                  {product.productLink ? "View Link(s)" : (
+                  {product.productLink && product.productLink.length > 0 ? "View Link(s)" : (
                     <span style={{ color: "#7D7D7D", fontStyle: "italic" }}>No link</span>
                   )}
                 </button>
                 {expandedRow === product._id && product.productLink && (
-                  <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  <div
+                    style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}
+                  >
                     {(() => {
                       const links = Array.isArray(product.productLink)
                         ? product.productLink
-                        : product.productLink.split(",").map(link => link.trim());
+                        : product.productLink.split(",").map((link) => link.trim());
                       return links.map((link, index) => (
                         <a
                           key={index}

@@ -7,22 +7,12 @@ import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import "../index.css";
 
 const categories = ["Enchanted Dew", "Ethereal Petals", "Mystic Horizon"];
-
-const saddleBrown = "#8B4513";
-const saddleBrownHover = "#7A3E0F";
-const greekVilla = "#F0EBE3";
-const cream = "#F0EBE3";
-const bgTab = "#121212";
+const saddleBrown = "#8B4513", saddleBrownHover = "#7A3E0F", greekVilla = "#F0EBE3", cream = "#F0EBE3", bgTab = "#121212";
 
 const CreateProductForm = () => {
   const [newProduct, setNewProduct] = useState({
-    name: "",
-    description: "",
-    price: "",
-    category: "",
-    image: "",
-    productLink: [],
-    comingSoon: false,
+    name: "", description: "", price: "", category: "",
+    images: [], productLink: [], comingSoon: false
   });
 
   const { createProduct, loading } = useProductStore();
@@ -33,13 +23,8 @@ const CreateProductForm = () => {
     try {
       await createProduct({ ...newProduct });
       setNewProduct({
-        name: "",
-        description: "",
-        price: "",
-        category: "",
-        image: "",
-        productLink: [],
-        comingSoon: false,
+        name: "", description: "", price: "", category: "",
+        images: [], productLink: [], comingSoon: false
       });
     } catch (error) {
       console.error("Error creating product:", error.message);
@@ -57,49 +42,39 @@ const CreateProductForm = () => {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProduct((prev) => ({ ...prev, image: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
+    const files = Array.from(e.target.files);
+    const imageReaders = files.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(imageReaders).then(images => {
+      setNewProduct(prev => ({ ...prev, images: [...prev.images, ...images] }));
+    });
   };
 
-  // Add links from input string, splitting by comma, space, or newline
   const addLinks = (input) => {
-    const links = input
-      .split(/[, \n]+/)
-      .map((l) => l.trim())
-      .filter((l) => l && !newProduct.productLink.includes(l));
-
-    if (links.length) {
-      setNewProduct((prev) => ({
-        ...prev,
-        productLink: [...prev.productLink, ...links],
-      }));
-    }
+    const links = input.split(/[, \n]+/).map((l) => l.trim()).filter((l) => l && !newProduct.productLink.includes(l));
+    if (links.length) setNewProduct((prev) => ({ ...prev, productLink: [...prev.productLink, ...links] }));
   };
 
-  // Handle keydown for comma or enter to add tags
   const handleKeyDown = (e) => {
     if (e.key === "," || e.key === "Enter") {
       e.preventDefault();
       addLinks(e.target.value);
-      e.target.value = ""; // <-- Clear input after adding
+      e.target.value = "";
     }
   };
 
-  // Handle paste event to add multiple links
   const handlePaste = (e) => {
     e.preventDefault();
-    const paste = e.clipboardData.getData("text");
-    addLinks(paste);
-    if (inputRef.current) inputRef.current.value = ""; // <-- Clear input after paste
+    addLinks(e.clipboardData.getData("text"));
+    if (inputRef.current) inputRef.current.value = "";
   };
 
-  // Remove a link tag by index
   const removeLink = (index) => {
     setNewProduct((prev) => {
       const newLinks = [...prev.productLink];
@@ -108,257 +83,125 @@ const CreateProductForm = () => {
     });
   };
 
+  const removeImage = (indexToRemove) => {
+    setNewProduct((prev) => {
+      const newImages = [...prev.images];
+      newImages.splice(indexToRemove, 1);
+      return { ...prev, images: newImages };
+    });
+  };
+
+
   return (
-    <div
-      className="flex flex-col justify-start sm:px-6 lg:px-8 min-h-screen"
-      style={{ backgroundColor: bgTab, paddingTop: "2rem" }}
-    >
-      <motion.div
-        className="sm:mx-auto sm:w-full sm:max-w-3xl"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        <h2 className="text-center text-3xl font-extrabold" style={{ color: greekVilla }}>
-          {/* Create New Product */}
-        </h2>
+    <div className="flex flex-col justify-start sm:px-6 lg:px-8 min-h-screen" style={{ backgroundColor: bgTab, paddingTop: "2rem" }}>
+      <motion.div className="sm:mx-auto sm:w-full sm:max-w-3xl" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+        <h2 className="text-center text-3xl font-extrabold" style={{ color: greekVilla }}></h2>
       </motion.div>
 
-      <motion.div
-        className="mt-8 sm:mx-auto sm:w-full sm:max-w-3xl"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-      >
-        <div
-          className="py-8 px-6 shadow-sm sm:rounded-lg sm:px-10"
-          style={{
-            backgroundColor: "#000000",
-            boxShadow: `0 4px 15px 0 rgba(139, 69, 19, 0.7)`,
-          }}
-        >
+      <motion.div className="mt-8 sm:mx-auto sm:w-full sm:max-w-3xl" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.2 }}>
+        <div className="py-8 px-6 shadow-sm sm:rounded-lg sm:px-10" style={{ backgroundColor: "#000000", boxShadow: `0 4px 15px 0 rgba(139, 69, 19, 0.7)` }}>
           <form onSubmit={handleSubmit} className="space-y-6">
+
             {/* Product Name */}
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium"
-                style={{ color: greekVilla }}
-              >
-                Product Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={newProduct.name}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, name: e.target.value })
-                }
+              <label htmlFor="name" className="block text-sm font-medium" style={{ color: greekVilla }}>Product Name</label>
+              <input type="text" id="name" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                 className="block w-full px-3 py-2 rounded-md shadow-sm sm:text-sm"
-                style={{
-                  backgroundColor: bgTab,
-                  border: `1px solid ${saddleBrown}`,
-                  color: greekVilla,
-                  caretColor: greekVilla,
-                }}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-                required
-                placeholder=""
-              />
+                style={{ backgroundColor: bgTab, border: `1px solid ${saddleBrown}`, color: greekVilla }}
+                onFocus={handleFocus} onBlur={handleBlur} required />
             </div>
 
-            {/* Description with CKEditor */}
+            {/* Description */}
             <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium mb-1"
-                style={{ color: greekVilla }}
-              >
-                Description
-              </label>
-              <CKEditor
-                editor={ClassicEditor}
-                data={newProduct.description}
-                onChange={(event, editor) => {
-                  const data = editor.getData();
-                  setNewProduct({ ...newProduct, description: data });
-                }}
-                config={{
-                  toolbar: [
-                    "bold",
-                    "italic",
-                    "link",
-                    "undo",
-                    "redo",
-                    "bulletedList",
-                    "numberedList",
-                  ],
-                  height: 150,
-                }}
-              />
+              <label htmlFor="description" className="block text-sm font-medium mb-1" style={{ color: greekVilla }}>Description</label>
+              <CKEditor editor={ClassicEditor} data={newProduct.description}
+                onChange={(event, editor) => setNewProduct({ ...newProduct, description: editor.getData() })}
+                config={{ toolbar: ["bold", "italic", "link", "undo", "redo", "bulletedList", "numberedList"], height: 150 }} />
             </div>
 
             {/* Category */}
             <div>
-              <label
-                htmlFor="category"
-                className="block text-sm font-medium"
-                style={{ color: greekVilla }}
-              >
-                Category
-              </label>
-              <select
-                id="category"
-                name="category"
-                value={newProduct.category}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, category: e.target.value })
-                }
+              <label htmlFor="category" className="block text-sm font-medium" style={{ color: greekVilla }}>Category</label>
+              <select id="category" value={newProduct.category}
+                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                 className="block w-full px-3 py-2 rounded-md shadow-sm sm:text-sm"
-                style={{
-                  backgroundColor: bgTab,
-                  border: `1px solid ${saddleBrown}`,
-                  color: greekVilla,
-                }}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-                required
-              >
-                <option value="" style={{ color: "#888" }}>
-                  Select a category
-                </option>
-                {categories.map((category) => (
-                  <option
-                    key={category}
-                    value={category}
-                    style={{ backgroundColor: bgTab, color: greekVilla }}
-                  >
-                    {category}
-                  </option>
-                ))}
+                style={{ backgroundColor: bgTab, border: `1px solid ${saddleBrown}`, color: greekVilla }}
+                onFocus={handleFocus} onBlur={handleBlur} required>
+                <option value="">Select a category</option>
+                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
 
-            {/* Product Links as tags */}
+            {/* Product Links */}
             <div>
-              <label
-                htmlFor="productLinkInput"
-                className="block text-sm font-medium"
-                style={{ color: greekVilla }}
-              >
-                Product Links
-              </label>
-              <div
-                className="flex flex-wrap gap-2 p-2 rounded-md border"
-                style={{
-                  backgroundColor: bgTab,
-                  border: `1px solid ${saddleBrown}`,
-                  color: greekVilla,
-                  minHeight: "60px",
-                  cursor: "text",
-                }}
-                onClick={() => inputRef.current?.focus()}
-              >
+              <label htmlFor="productLinkInput" className="block text-sm font-medium" style={{ color: greekVilla }}>Product Links</label>
+              <div className="flex flex-wrap gap-2 p-2 rounded-md border"
+                style={{ backgroundColor: bgTab, border: `1px solid ${saddleBrown}`, color: greekVilla }}
+                onClick={() => inputRef.current?.focus()}>
                 {newProduct.productLink.map((link, i) => (
-                  <span
-                    key={i}
-                    className="flex items-center px-2 py-1 rounded"
-                    style={{ backgroundColor: saddleBrownHover, color: greekVilla }}
-                  >
+                  <span key={i} className="flex items-center px-2 py-1 rounded" style={{ backgroundColor: saddleBrownHover }}>
                     {link}
-                    <button
-                      type="button"
-                      onClick={() => removeLink(i)}
-                      className="ml-1 text-xs font-bold"
-                      style={{ color: greekVilla, cursor: "pointer", background: "transparent", border: "none" }}
-                    >
-                      ×
-                    </button>
+                    <button onClick={() => removeLink(i)} className="ml-1 text-xs font-bold" style={{ background: "transparent", border: "none", color: greekVilla }}>×</button>
                   </span>
                 ))}
-                <input
-                  ref={inputRef}
-                  type="text"
-                  id="productLinkInput"
-                  placeholder="Paste/type links, press comma or enter"
+                <input ref={inputRef} type="text" placeholder="Paste/type links, press comma or enter"
                   className="flex-grow bg-transparent border-none outline-none text-sm"
-                  style={{ color: greekVilla, caretColor: greekVilla, minWidth: "120px" }}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                />
+                  style={{ color: greekVilla }} onKeyDown={handleKeyDown} onPaste={handlePaste} />
               </div>
             </div>
 
+            {/* Coming Soon */}
             <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                style={{ color: greekVilla }}
-              >
-                Coming Soon
-              </label>
-              <button
-                type="button"
-                onClick={() =>
-                  setNewProduct({ ...newProduct, comingSoon: !newProduct.comingSoon })
-                }
-                className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{
-                  backgroundColor: newProduct.comingSoon ? saddleBrownHover : bgTab,
-                  color: greekVilla,
-                  borderColor: saddleBrown,
-                  transition: "background-color 0.3s ease",
-                  userSelect: "none",
-                  cursor: "pointer",
-                }}
-              >
+              <label className="block text-sm font-medium mb-1" style={{ color: greekVilla }}>Coming Soon</label>
+              <button type="button" onClick={() => setNewProduct({ ...newProduct, comingSoon: !newProduct.comingSoon })}
+                className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-semibold"
+                style={{ backgroundColor: newProduct.comingSoon ? saddleBrownHover : bgTab, color: greekVilla, borderColor: saddleBrown }}>
                 {newProduct.comingSoon ? "Enabled" : "Disabled"}
               </button>
             </div>
 
             {/* Image Upload */}
             <div>
-              <input
-                type="file"
-                id="image"
-                className="sr-only"
-                accept="image/*"
-                onChange={handleImageChange}
-              />
-              <label
-                htmlFor="image"
-                className="cursor-pointer inline-flex items-center rounded-md border px-4 py-2 text-sm font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{ backgroundColor: bgTab, color: greekVilla }}
-              >
-                <Upload className="mr-2 h-5 w-5" />
-                Upload Image
+              <input type="file" id="images" multiple accept="image/*" className="sr-only" onChange={handleImageChange} />
+              <label htmlFor="images"
+                className="cursor-pointer inline-flex items-center rounded-md border px-4 py-2 text-sm font-semibold shadow-sm"
+                style={{ backgroundColor: bgTab, color: greekVilla }}>
+                <Upload className="mr-2 h-5 w-5" /> Select Images
               </label>
-              {newProduct.image && (
-                <span className="ml-3 text-sm" style={{ color: greekVilla }}>
-                  Image uploaded
-                </span>
-              )}
+
+              {/* Image Previews */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {newProduct.images.map((src, index) => (
+                  <div
+                    key={index}
+                    className="relative mt-2 h-20 w-20 rounded-md"
+                    style={{ border: `1px solid ${saddleBrown}` }}
+                  >
+                    <img
+                      src={src}
+                      alt={`preview-${index}`}
+                      className="h-full w-full object-cover rounded-md"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center shadow-md"
+                      title="Remove Image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
             </div>
 
             {/* Submit Button */}
-            <button
-              type="submit"
-              className="inline-flex w-full justify-center rounded-md border border-transparent bg-saddleBrown px-4 py-2 text-sm font-semibold text-greekVilla shadow-sm hover:bg-saddleBrownHover focus:outline-none focus:ring-2 focus:ring-offset-2"
+            <button type="submit"
+              className="inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-sm font-semibold"
               disabled={loading}
-              style={{ backgroundColor: saddleBrown, color: greekVilla }}
-            >
-              {loading ? (
-                <>
-                  <Loader className="animate-spin mr-2 h-5 w-5" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <PlusCircle className="mr-2 h-5 w-5" />
-                  Create Product
-                </>
-              )}
+              style={{ backgroundColor: saddleBrown, color: greekVilla }}>
+              {loading ? (<><Loader className="animate-spin mr-2 h-5 w-5" /> Creating...</>) : (<><PlusCircle className="mr-2 h-5 w-5" /> Create Product</>)}
             </button>
           </form>
         </div>
