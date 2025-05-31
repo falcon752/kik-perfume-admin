@@ -341,16 +341,25 @@ const EditProductForm = ({ product, onSave, onCancel, loading }) => {
         </div>
       )}
 
-      <label style={{ cursor: "pointer" }}>
-        Coming Soon
-        <input
-          type="checkbox"
-          name="comingSoon"
-          checked={editedProduct.comingSoon || false}
-          onChange={handleInputChange}
-          style={{ marginLeft: "0.5rem" }}
-        />
-      </label>
+{/* Coming Soon */}
+<div>
+  <label className="block text-sm font-medium mb-1" style={{ color: greekVilla }}>
+    Coming Soon
+  </label>
+  <button
+    type="button"
+    onClick={() => setEditedProduct({ ...editedProduct, comingSoon: !editedProduct.comingSoon })}
+    className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-semibold"
+    style={{
+      backgroundColor: editedProduct.comingSoon ? saddleBrownHover : bgTab,
+      color: greekVilla,
+      borderColor: saddleBrown,
+    }}
+  >
+    {editedProduct.comingSoon ? "Enabled" : "Disabled"}
+  </button>
+</div>
+
 
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button
