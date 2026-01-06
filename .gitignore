@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 
+abc.txt
 .env
 build
 build.zip
