@@ -1,10 +1,9 @@
-import { redis } from "../lib/redis.js";
 import cloudinary from "../lib/cloudinary.js";
 import Product from "../models/product.model.js";
 
 export const getAllProducts = async (req, res) => {
 	try {
-		const products = await Product.find({}); // find all products
+		const products = await Product.find({});
 		res.json({ products });
 	} catch (error) {
 		console.log("Error in getAllProducts controller", error.message);
@@ -14,18 +13,11 @@ export const getAllProducts = async (req, res) => {
 
 export const getFeaturedProducts = async (req, res) => {
 	try {
-		let featuredProducts = await redis.get("featured_products");
-		if (featuredProducts) {
-			return res.json(JSON.parse(featuredProducts));
-		}
+		const featuredProducts = await Product.find({ isFeatured: true }).lean();
 
-		featuredProducts = await Product.find({ isFeatured: true }).lean();
-
-		if (!featuredProducts) {
+		if (!featuredProducts || featuredProducts.length === 0) {
 			return res.status(404).json({ message: "No featured products found" });
 		}
-
-		await redis.set("featured_products", JSON.stringify(featuredProducts));
 
 		res.json(featuredProducts);
 	} catch (error) {
@@ -42,12 +34,10 @@ export const createProduct = async (req, res) => {
 
 		if (Array.isArray(images)) {
 			for (const img of images) {
-				// Upload if the image is a base64 string or data URI (new image)
-				if (typeof img === "string" && (img.startsWith("data:") || img.startsWith("http") === false)) {
+				if (typeof img === "string" && (img.startsWith("data:") || !img.startsWith("http"))) {
 					const response = await cloudinary.uploader.upload(img, { folder: "products" });
 					imageUrls.push(response.secure_url);
 				} else if (typeof img === "string") {
-					// If it's already a URL, just push it as is (rare for create, but safe)
 					imageUrls.push(img);
 				}
 			}
@@ -79,12 +69,11 @@ export const updateProduct = async (req, res) => {
 			return res.status(404).json({ message: "Product not found" });
 		}
 
-		// Delete removed images from Cloudinary
 		if (Array.isArray(removedImages) && removedImages.length > 0) {
 			for (const imgUrl of removedImages) {
 				try {
 					const parts = imgUrl.split("/");
-					const filename = parts[parts.length - 1]; // e.g. "abc123.jpg"
+					const filename = parts[parts.length - 1];
 					const publicId = `products/${filename.split(".")[0]}`;
 					await cloudinary.uploader.destroy(publicId);
 				} catch (error) {
@@ -93,18 +82,15 @@ export const updateProduct = async (req, res) => {
 			}
 		}
 
-		// Build new image array keeping existing URLs (not removed) and uploading new base64 images
 		let updatedImages = [];
 
 		if (Array.isArray(images)) {
 			for (const img of images) {
 				if (typeof img === "string") {
 					if (img.startsWith("data:")) {
-						// New image (base64/data URI) -> upload
 						const response = await cloudinary.uploader.upload(img, { folder: "products" });
 						updatedImages.push(response.secure_url);
 					} else {
-						// Existing image URL -> keep it if not in removedImages
 						if (!removedImages || !removedImages.includes(img)) {
 							updatedImages.push(img);
 						}
@@ -114,7 +100,6 @@ export const updateProduct = async (req, res) => {
 		}
 
 		product.images = updatedImages.length > 0 ? updatedImages : product.images;
-
 		product.name = name || product.name;
 		product.description = description || product.description;
 		product.category = category || product.category;
@@ -131,11 +116,6 @@ export const updateProduct = async (req, res) => {
 
 		const updatedProduct = await product.save();
 
-		// Update cache if product is featured
-		if (updatedProduct.isFeatured) {
-			await updateFeaturedProductsCache();
-		}
-
 		res.json(updatedProduct);
 	} catch (error) {
 		console.log("Error in updateProduct controller", error.message);
@@ -151,7 +131,6 @@ export const deleteProduct = async (req, res) => {
 			return res.status(404).json({ message: "Product not found" });
 		}
 
-		// Delete all images from Cloudinary
 		if (product.images && product.images.length > 0) {
 			for (const imgUrl of product.images) {
 				try {
@@ -159,7 +138,6 @@ export const deleteProduct = async (req, res) => {
 					const filename = parts[parts.length - 1];
 					const publicId = `products/${filename.split(".")[0]}`;
 					await cloudinary.uploader.destroy(publicId);
-					console.log("Deleted image from Cloudinary");
 				} catch (error) {
 					console.log("Error deleting image from Cloudinary", error);
 				}
@@ -167,9 +145,6 @@ export const deleteProduct = async (req, res) => {
 		}
 
 		await Product.findByIdAndDelete(req.params.id);
-
-		// Update cache if needed
-		await updateFeaturedProductsCache();
 
 		res.json({ message: "Product deleted successfully" });
 	} catch (error) {
@@ -181,9 +156,7 @@ export const deleteProduct = async (req, res) => {
 export const getRecommendedProducts = async (req, res) => {
 	try {
 		const products = await Product.aggregate([
-			{
-				$sample: { size: 4 },
-			},
+			{ $sample: { size: 4 } },
 			{
 				$project: {
 					_id: 1,
@@ -218,7 +191,6 @@ export const toggleFeaturedProduct = async (req, res) => {
 		if (product) {
 			product.isFeatured = !product.isFeatured;
 			const updatedProduct = await product.save();
-			await updateFeaturedProductsCache();
 			res.json(updatedProduct);
 		} else {
 			res.status(404).json({ message: "Product not found" });
@@ -228,15 +200,6 @@ export const toggleFeaturedProduct = async (req, res) => {
 		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };
-
-async function updateFeaturedProductsCache() {
-	try {
-		const featuredProducts = await Product.find({ isFeatured: true }).lean();
-		await redis.set("featured_products", JSON.stringify(featuredProducts));
-	} catch (error) {
-		console.log("Error in updateFeaturedProductsCache function", error.message);
-	}
-}
 
 export const getProductById = async (req, res) => {
 	try {

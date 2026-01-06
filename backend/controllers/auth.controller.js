@@ -1,7 +1,7 @@
-import { redis } from "../lib/redis.js";
-import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
+import User from "../models/user.model.js";
 
+// Generate Access and Refresh Tokens
 const generateTokens = (userId) => {
 	const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
 		expiresIn: "15m",
@@ -14,25 +14,24 @@ const generateTokens = (userId) => {
 	return { accessToken, refreshToken };
 };
 
-const storeRefreshToken = async (userId, refreshToken) => {
-	await redis.set(`refresh_token:${userId}`, refreshToken, "EX", 7 * 24 * 60 * 60); // 7days
-};
-
+// Set cookies
 const setCookies = (res, accessToken, refreshToken) => {
 	res.cookie("accessToken", accessToken, {
-		httpOnly: true, // prevent XSS attacks, cross site scripting attack
+		httpOnly: true,
 		secure: process.env.NODE_ENV === "production",
-		sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
+		sameSite: "strict",
 		maxAge: 15 * 60 * 1000, // 15 minutes
 	});
+
 	res.cookie("refreshToken", refreshToken, {
-		httpOnly: true, // prevent XSS attacks, cross site scripting attack
+		httpOnly: true,
 		secure: process.env.NODE_ENV === "production",
-		sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
+		sameSite: "strict",
 		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 	});
 };
 
+// Signup controller
 export const signup = async (req, res) => {
 	const { email, password, name } = req.body;
 	try {
@@ -41,12 +40,10 @@ export const signup = async (req, res) => {
 		if (userExists) {
 			return res.status(400).json({ message: "User already exists" });
 		}
+
 		const user = await User.create({ name, email, password });
 
-		// authenticate
 		const { accessToken, refreshToken } = generateTokens(user._id);
-		await storeRefreshToken(user._id, refreshToken);
-
 		setCookies(res, accessToken, refreshToken);
 
 		res.status(201).json({
@@ -56,11 +53,12 @@ export const signup = async (req, res) => {
 			role: user.role,
 		});
 	} catch (error) {
-		console.log("Error in signup controller", error.message);
-		res.status(500).json({ message: error.message });
+		console.log("Error in signup controller:", error.message);
+		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };
 
+// Login controller
 export const login = async (req, res) => {
 	try {
 		const { email, password } = req.body;
@@ -68,7 +66,6 @@ export const login = async (req, res) => {
 
 		if (user && (await user.comparePassword(password))) {
 			const { accessToken, refreshToken } = generateTokens(user._id);
-			await storeRefreshToken(user._id, refreshToken);
 			setCookies(res, accessToken, refreshToken);
 
 			res.json({
@@ -81,29 +78,24 @@ export const login = async (req, res) => {
 			res.status(400).json({ message: "Invalid email or password" });
 		}
 	} catch (error) {
-		console.log("Error in login controller", error.message);
-		res.status(500).json({ message: error.message });
-	}
-};
-
-export const logout = async (req, res) => {
-	try {
-		const refreshToken = req.cookies.refreshToken;
-		if (refreshToken) {
-			const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-			await redis.del(`refresh_token:${decoded.userId}`);
-		}
-
-		res.clearCookie("accessToken");
-		res.clearCookie("refreshToken");
-		res.json({ message: "Logged out successfully" });
-	} catch (error) {
-		console.log("Error in logout controller", error.message);
+		console.log("Error in login controller:", error.message);
 		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };
 
-// this will refresh the access token
+// Logout controller
+export const logout = async (req, res) => {
+	try {
+		res.clearCookie("accessToken");
+		res.clearCookie("refreshToken");
+		res.json({ message: "Logged out successfully" });
+	} catch (error) {
+		console.log("Error in logout controller:", error.message);
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
+};
+
+// Refresh token controller
 export const refreshToken = async (req, res) => {
 	try {
 		const refreshToken = req.cookies.refreshToken;
@@ -113,13 +105,12 @@ export const refreshToken = async (req, res) => {
 		}
 
 		const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-		const storedToken = await redis.get(`refresh_token:${decoded.userId}`);
 
-		if (storedToken !== refreshToken) {
-			return res.status(401).json({ message: "Invalid refresh token" });
-		}
-
-		const accessToken = jwt.sign({ userId: decoded.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+		const accessToken = jwt.sign(
+			{ userId: decoded.userId },
+			process.env.ACCESS_TOKEN_SECRET,
+			{ expiresIn: "15m" }
+		);
 
 		res.cookie("accessToken", accessToken, {
 			httpOnly: true,
@@ -130,11 +121,12 @@ export const refreshToken = async (req, res) => {
 
 		res.json({ message: "Token refreshed successfully" });
 	} catch (error) {
-		console.log("Error in refreshToken controller", error.message);
+		console.log("Error in refreshToken controller:", error.message);
 		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };
 
+// Get logged-in user's profile
 export const getProfile = async (req, res) => {
 	try {
 		res.json(req.user);

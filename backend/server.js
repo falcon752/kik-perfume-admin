@@ -27,10 +27,21 @@ const __dirname = path.resolve();
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+
   'http://kikperfume.com',
   'https://kikperfume.com',
+  'http://www.kikperfume.com',
+  'https://www.kikperfume.com',
+
+  'http://admin.kikperfume.com',
+  'https://admin.kikperfume.com',
+  'http://www.admin.kikperfume.com',    // only if used
+  'https://www.admin.kikperfume.com',   // only if used
+
   'http://progress.kikperfume.com',
-  'https://progress.kikperfume.com'
+  'https://progress.kikperfume.com',
+  'http://www.progress.kikperfume.com', // only if used
+  'https://www.progress.kikperfume.com' // only if used
 ];
 
 app.use(cors({
